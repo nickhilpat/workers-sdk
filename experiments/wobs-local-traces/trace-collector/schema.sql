@@ -51,3 +51,25 @@ CREATE TABLE IF NOT EXISTS logs (
 
 CREATE INDEX IF NOT EXISTS idx_logs_created ON logs(created_at);
 CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
+
+-- Audit log of MCP tool calls made by a connected agent (the "Agent activity"
+-- view on the MCP page). Written by the local MCP server on each tool call.
+CREATE TABLE IF NOT EXISTS mcp_calls (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  tool       TEXT,                -- MCP tool name (e.g. list_recent_errors)
+  args       TEXT,                -- JSON-stringified request arguments
+  result     TEXT,                -- short summary / JSON of what was returned
+  status     TEXT,                -- ok | error | denied
+  created_at TEXT DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_mcp_calls_created ON mcp_calls(created_at);
+
+-- Single-row access config the MCP server reads to gate what a connected agent
+-- can see (allowed log levels + per-binding data access). Edited from the MCP
+-- page in the local explorer.
+CREATE TABLE IF NOT EXISTS mcp_config (
+  id         INTEGER PRIMARY KEY CHECK (id = 1),
+  config     TEXT,                -- JSON: { logLevels: {...}, resources: {...} }
+  updated_at TEXT DEFAULT (datetime('now'))
+);
