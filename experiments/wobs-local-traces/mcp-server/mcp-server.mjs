@@ -326,19 +326,31 @@ const TOOLS = [
 			);
 
 			// locate the failure
-			let failed_at, reason;
+			let failed_at, reason, inferred;
 			if (failingRaw.length) {
-				failed_at = failingRaw[0].name;
+				// a span was actually flagged failed — high confidence
+				failed_at = `at ${failingRaw[0].name}`;
 				reason = failingRaw[0].error || `outcome: ${failingRaw[0].outcome}`;
 			} else if (errored) {
+				// nothing flagged (e.g. uncaught + swallowed by wrangler dev). Point at
+				// the last step that *succeeded* rather than guessing the slowest span.
 				const errLog = logs.find((l) => l.level === "error");
-				failed_at = grouped[0] ? `${grouped[0].name} (inferred)` : "unknown";
 				reason = errLog ? errLog.msg : trace.error || `status ${trace.status_code}`;
+				const successLogs = logs.filter((l) => l.level !== "error");
+				const lastStep = successLogs[successLogs.length - 1];
+				if (lastStep) {
+					failed_at = `after "${lastStep.msg.slice(0, 80)}"`;
+				} else if (spans.length) {
+					failed_at = `after ${spans[spans.length - 1].name}`;
+				} else {
+					failed_at = `in ${trace.name || "handler"}`;
+				}
+				inferred = true;
 			}
 
 			const dur = Math.round(trace.duration_ms ?? 0);
 			const summary = errored
-				? `${trace.name} → ${trace.status_code ?? "?"} after ${dur}ms; failed at ${failed_at}${reason ? ` (${String(reason).slice(0, 140)})` : ""}`
+				? `${trace.name} → ${trace.status_code ?? "?"} after ${dur}ms; failed ${failed_at}${reason ? ` (${String(reason).slice(0, 140)})` : ""}`
 				: `${trace.name} → ${trace.status_code ?? "ok"} in ${dur}ms, ${spans.length} spans`;
 
 			const out = prune({
@@ -350,6 +362,7 @@ const TOOLS = [
 				duration_ms: dur,
 				error: trace.error,
 				failed_at: errored ? failed_at : undefined,
+				failed_at_inferred: inferred || undefined,
 				reason: errored && reason ? String(reason).slice(0, 300) : undefined,
 				stack: stack
 					? stack.split("\n").slice(0, detail ? 30 : 6).join("\n")
