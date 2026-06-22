@@ -153,7 +153,15 @@ export default class TraceCollector extends WorkerEntrypoint {
 				}
 				case "exception": {
 					const s = spans.get(ctxSpanId) ?? spans.get(rootId);
-					if (s) s.error = `${ev.name}: ${ev.message}`;
+					if (s) {
+						s.error = `${ev.name}: ${ev.message}`;
+						// `stack` is only present for *uncaught* exceptions (caught errors
+						// surface as console.error logs instead). Stash it in attributes —
+						// no schema change — so agents get a line-level locus when available.
+						if (ev.stack) {
+							s.attrs = { ...(s.attrs ?? {}), "exception.stack": ev.stack };
+						}
+					}
 					break;
 				}
 				case "outcome": {

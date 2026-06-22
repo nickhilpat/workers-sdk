@@ -10,14 +10,17 @@
  *   - enforces the access config set on the explorer's MCP page (log levels)
  *   - logs every tool call into `mcp_calls` so the dev sees what the agent did
  *
+ * Output is shaped for agents (token-light, signal-dense): a compact verdict by
+ * default, with a `detail: true` drill-down for the full span tree + attributes
+ * when a complex fix needs it.
+ *
  * Connect your agent by pointing it at:  node mcp-server.mjs
  * Configure the target explorer with:    WOBS_EXPLORER_URL (default :8799)
  *
  * Transport: newline-delimited JSON-RPC 2.0 over stdin/stdout (MCP stdio).
  * Nothing but protocol messages may be written to stdout — logs go to stderr.
- *
- * NOTE: the explorer's raw-query endpoint rejects bound params in LIMIT/SELECT
- * positions, so (like the UI) we interpolate values with escaping instead.
+ * NOTE: the raw-query endpoint rejects bound params in LIMIT/SELECT positions,
+ * so (like the UI) we interpolate values with escaping instead.
  */
 
 import readline from "node:readline";
@@ -35,12 +38,99 @@ function logErr(...args) {
 
 // ---- safe SQL value helpers (endpoint dislikes bound params) ----------------
 
-const q = (s) => `'${String(s).replace(/'/g, "''")}'`; // quoted string literal
+const q = (s) => `'${String(s).replace(/'/g, "''")}'`;
 const int = (n, dflt, max) => {
 	const v = Number(n);
 	const safe = Number.isFinite(v) ? Math.floor(v) : dflt;
 	return Math.max(1, Math.min(safe, max));
 };
+
+// ---- agent-friendly formatting (token-light, signal-dense) ------------------
+
+const stripAnsi = (s) => String(s).replace(/\u001b\[[0-9;]*m/g, "");
+
+/** Turn a stored console message (JSON array, often with ANSI) into a clean string. */
+function cleanMsg(raw) {
+	if (raw == null) {
+		return "";
+	}
+	let v = raw;
+	try {
+		v = JSON.parse(raw);
+	} catch {
+		// not JSON; treat as plain string
+	}
+	const flat = Array.isArray(v)
+		? v.map((x) => (typeof x === "string" ? x : JSON.stringify(x))).join(" ")
+		: typeof v === "string"
+			? v
+			: JSON.stringify(v);
+	return stripAnsi(flat).trim();
+}
+
+function parseAttrs(str) {
+	if (!str) {
+		return {};
+	}
+	try {
+		const o = JSON.parse(str);
+		return o && typeof o === "object" ? o : {};
+	} catch {
+		return {};
+	}
+}
+
+/** Pull the single most useful attribute (query text, url, key, ...) for a compact view. */
+function keyAttr(attrs) {
+	for (const k of [
+		"db.query.text",
+		"query",
+		"sql",
+		"url",
+		"http.url",
+		"http.request.url",
+		"key",
+		"rpcMethod",
+	]) {
+		if (attrs[k]) {
+			return { detail: String(attrs[k]).slice(0, 200) };
+		}
+	}
+	return {};
+}
+
+/** Collapse repeated sibling spans (e.g. an N+1 of 11 D1 calls) into one row. */
+function groupSpans(spans) {
+	const m = new Map();
+	for (const s of spans) {
+		const key = `${s.kind || ""}|${s.name || ""}`;
+		const g = m.get(key) || { name: s.name, kind: s.kind, count: 0, total_ms: 0 };
+		g.count += 1;
+		g.total_ms += s.duration_ms || 0;
+		m.set(key, g);
+	}
+	return [...m.values()]
+		.map((g) => ({ ...g, total_ms: Math.round(g.total_ms) }))
+		.sort((a, b) => b.total_ms - a.total_ms);
+}
+
+/** Drop null/undefined values and empty arrays/objects to save tokens. */
+function prune(obj) {
+	const out = {};
+	for (const [k, v] of Object.entries(obj)) {
+		if (v == null) {
+			continue;
+		}
+		if (Array.isArray(v) && v.length === 0) {
+			continue;
+		}
+		if (typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0) {
+			continue;
+		}
+		out[k] = v;
+	}
+	return out;
+}
 
 // ---- explorer HTTP / D1 -----------------------------------------------------
 
@@ -136,7 +226,7 @@ const TOOLS = [
 	{
 		name: "list_recent_errors",
 		description:
-			"List recent traces that failed (HTTP status >= 500, a non-ok outcome, or a thrown error). Use this to find what just broke. Returns trace_id, operation, status, duration, and the error.",
+			"List recent traces that failed (HTTP status >= 500, a non-ok outcome, or a thrown error). Use this to find what just broke, then call explain_trace on a trace_id. Returns trace_id, operation, status, duration, and the error.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -158,76 +248,144 @@ const TOOLS = [
 	{
 		name: "explain_trace",
 		description:
-			"Explain a single trace in depth: the failing span(s), the error, the slowest spans, and the log lines from the request (respecting allowed log levels). Use after list_recent_errors to root-cause a failure.",
+			"Root-cause a single trace. Returns a compact verdict by default: whether it errored, where it failed, grouped spans (repeats collapsed), cleaned logs, any stack trace, and a one-line summary. Pass detail:true for the full ordered span tree with every attribute (query text, URLs, keys) and per-span log correlation — use that when a complex fix needs the inputs/outputs of each call.",
 		inputSchema: {
 			type: "object",
 			properties: {
 				trace_id: { type: "string", description: "the trace to explain" },
+				detail: {
+					type: "boolean",
+					description:
+						"include the full ordered span tree + all attributes + log span correlation",
+				},
 			},
 			required: ["trace_id"],
 		},
-		run: async ({ trace_id }, cfg) => {
+		run: async ({ trace_id, detail }, cfg) => {
 			if (!trace_id) {
 				throw new Error("trace_id is required");
 			}
 			const [trace] = await sql(
-				`SELECT trace_id, name, status_code, outcome, error, duration_ms, span_count, created_at
+				`SELECT trace_id, root_span_id, name, status_code, outcome, error, duration_ms, span_count, created_at
 				 FROM traces WHERE trace_id = ${q(trace_id)} LIMIT 1`
 			);
 			if (!trace) {
 				return { found: false, trace_id };
 			}
-			const spans = await sql(
-				`SELECT span_id, parent_id, name, kind, duration_ms, outcome, error, attributes
+			const all = await sql(
+				`SELECT span_id, parent_id, name, kind, start_ms, duration_ms, outcome, error, attributes
 				 FROM spans WHERE trace_id = ${q(trace_id)} ORDER BY start_ms ASC`
 			);
-			const failing = spans.filter(
+			const spans = all.filter((s) => s.span_id !== trace.root_span_id);
+			const errored =
+				(trace.status_code ?? 0) >= 500 ||
+				(!!trace.outcome && trace.outcome !== "ok") ||
+				!!trace.error;
+			const grouped = groupSpans(spans);
+			const failingRaw = spans.filter(
 				(s) => s.error || (s.outcome && s.outcome !== "ok")
 			);
-			const slowest = [...spans]
-				.sort((a, b) => (b.duration_ms || 0) - (a.duration_ms || 0))
-				.slice(0, 5)
-				.map((s) => ({ name: s.name, kind: s.kind, ms: s.duration_ms }));
 
+			// logs (allowed levels only), cleaned + correlated to span
 			const levels = allowedLevels(cfg);
-			let logs = [];
+			let logRows = [];
 			if (levels.length) {
 				const inList = levels.map(q).join(",");
-				logs = await sql(
-					`SELECT level, message, operation, ts_ms FROM logs
+				logRows = await sql(
+					`SELECT level, message, span_id, ts_ms, seq FROM logs
 					 WHERE trace_id = ${q(trace_id)} AND level IN (${inList})
-					 ORDER BY seq ASC LIMIT 100`
+					 ORDER BY seq ASC LIMIT 200`
 				);
 			}
-			return {
-				found: true,
-				trace: {
-					trace_id: trace.trace_id,
-					operation: trace.name,
-					status: trace.status_code,
-					outcome: trace.outcome,
-					duration_ms: trace.duration_ms,
-					error: trace.error,
-				},
-				failing_spans: failing.map((s) => ({
+			const logs = logRows.map((l) =>
+				prune({
+					level: l.level,
+					at_ms: Math.round(l.ts_ms ?? 0),
+					span_id: detail ? l.span_id : undefined,
+					msg: cleanMsg(l.message),
+				})
+			);
+
+			// stack is only present for uncaught exceptions (stashed in attributes)
+			let stack;
+			for (const s of all) {
+				const a = parseAttrs(s.attributes);
+				if (a["exception.stack"]) {
+					stack = String(a["exception.stack"]);
+					break;
+				}
+			}
+
+			const failures = failingRaw.map((s) =>
+				prune({
 					name: s.name,
 					kind: s.kind,
-					error: s.error,
-					outcome: s.outcome,
-					attributes: s.attributes,
-				})),
-				slowest_spans: slowest,
+					error: s.error || `outcome: ${s.outcome}`,
+					...keyAttr(parseAttrs(s.attributes)),
+				})
+			);
+
+			// locate the failure
+			let failed_at, reason;
+			if (failingRaw.length) {
+				failed_at = failingRaw[0].name;
+				reason = failingRaw[0].error || `outcome: ${failingRaw[0].outcome}`;
+			} else if (errored) {
+				const errLog = logs.find((l) => l.level === "error");
+				failed_at = grouped[0] ? `${grouped[0].name} (inferred)` : "unknown";
+				reason = errLog ? errLog.msg : trace.error || `status ${trace.status_code}`;
+			}
+
+			const dur = Math.round(trace.duration_ms ?? 0);
+			const summary = errored
+				? `${trace.name} → ${trace.status_code ?? "?"} after ${dur}ms; failed at ${failed_at}${reason ? ` (${String(reason).slice(0, 140)})` : ""}`
+				: `${trace.name} → ${trace.status_code ?? "ok"} in ${dur}ms, ${spans.length} spans`;
+
+			const out = prune({
+				found: true,
+				errored,
+				operation: trace.name,
+				status: trace.status_code,
+				outcome: trace.outcome,
+				duration_ms: dur,
+				error: trace.error,
+				failed_at: errored ? failed_at : undefined,
+				reason: errored && reason ? String(reason).slice(0, 300) : undefined,
+				stack: stack
+					? stack.split("\n").slice(0, detail ? 30 : 6).join("\n")
+					: undefined,
+				failures,
+				spans: grouped,
 				logs,
 				note: levels.length
 					? undefined
-					: "All log levels are disabled in the MCP access config; no logs returned.",
-			};
+					: "All log levels disabled in MCP access config; no logs returned.",
+				summary,
+			});
+
+			if (detail) {
+				out.span_tree = spans.map((s) => {
+					const a = parseAttrs(s.attributes);
+					return prune({
+						span_id: s.span_id,
+						parent_id: s.parent_id,
+						name: s.name,
+						kind: s.kind,
+						at_ms: Math.round(s.start_ms ?? 0),
+						ms: Math.round(s.duration_ms ?? 0),
+						outcome: s.outcome,
+						error: s.error,
+						attributes: a,
+					});
+				});
+			}
+			return out;
 		},
 	},
 	{
 		name: "search_logs",
 		description:
-			"Search console logs across recent requests by free text and/or level. Only returns levels allowed in the MCP access config.",
+			"Search console logs across recent requests by free text and/or level. Messages are cleaned (ANSI stripped, flattened). Only returns levels allowed in the MCP access config.",
 		inputSchema: {
 			type: "object",
 			properties: {
@@ -265,13 +423,20 @@ const TOOLS = [
 			}
 			const rows = await sql(
 				`SELECT level, message, operation, trace_id, created_at FROM logs
-				 WHERE ${where} ORDER BY created_at DESC, ROWID DESC LIMIT ${int(
-					limit,
-					50,
-					200
-				)}`
+				 WHERE ${where} ORDER BY created_at DESC, ROWID DESC LIMIT ${int(limit, 50, 200)}`
 			);
-			return { count: rows.length, logs: rows };
+			return {
+				count: rows.length,
+				logs: rows.map((r) =>
+					prune({
+						level: r.level,
+						operation: r.operation,
+						trace_id: r.trace_id,
+						at: r.created_at,
+						msg: cleanMsg(r.message),
+					})
+				),
+			};
 		},
 	},
 ];
@@ -304,7 +469,6 @@ async function handleToolCall(id, params) {
 		const cfg = await getConfig();
 		const result = await tool.run(args, cfg);
 		const text = JSON.stringify(result, null, 2);
-		// store the full response so the dev can expand it in Agent activity
 		await audit(name, args, result.denied ? "denied" : "ok", text);
 		reply(id, { content: [{ type: "text", text }] });
 	} catch (e) {
@@ -323,11 +487,11 @@ async function handle(msg) {
 			return reply(id, {
 				protocolVersion: PROTOCOL_VERSION,
 				capabilities: { tools: {} },
-				serverInfo: { name: "wobs-local", version: "0.1.0" },
+				serverInfo: { name: "wobs-local", version: "0.2.0" },
 			});
 		case "notifications/initialized":
 		case "initialized":
-			return; // notification, no response
+			return;
 		case "ping":
 			return reply(id, {});
 		case "tools/list":
