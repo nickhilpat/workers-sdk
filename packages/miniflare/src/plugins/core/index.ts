@@ -1253,7 +1253,7 @@ export function getGlobalServices({
 	// Local observability (experimental): register the internal trace collector
 	// service. Core attaches it to each user worker's streaming tail above.
 	if (sharedOptions.unsafeObservability) {
-		services.push(...getObservabilityServices());
+		services.push(...getObservabilityServices(tmpPath));
 	}
 
 	return services;
