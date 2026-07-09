@@ -8,6 +8,7 @@ import {
 import {
 	getBrowserRenderingHeadfulFromEnv,
 	getLocalExplorerEnabledFromEnv,
+	getLocalObservabilityEnabledFromEnv,
 	UserError,
 } from "@cloudflare/workers-utils";
 import { Log, LogLevel } from "miniflare";
@@ -75,6 +76,7 @@ export interface ConfigBundle {
 	complianceRegion: Config["compliance_region"] | undefined;
 	bindings: StartDevWorkerInput["bindings"];
 	migrations: Config["migrations"] | undefined;
+	exports: Config["exports"] | undefined;
 	devRegistry: string | undefined;
 	legacyAssetPaths: LegacyAssetPaths | undefined;
 	assets: AssetsOptions | undefined;
@@ -406,8 +408,16 @@ function dispatchNamespaceEntry(
 	}
 	return [binding, { namespace, remoteProxyConnectionString }];
 }
-function ratelimitEntry<T extends { name: string }>(ratelimit: T): [string, T] {
-	return [ratelimit.name, ratelimit];
+function ratelimitEntry<T extends { name: string; namespace_id?: string }>(
+	ratelimit: T
+): [string, T & { namespace_id: string }] {
+	// Miniflare keys rate-limit counters by namespace_id. Regular `ratelimit`
+	// bindings always carry one; freeform `unsafe_ratelimit` bindings may not,
+	// so fall back to the binding name to preserve per-binding isolation.
+	return [
+		ratelimit.name,
+		{ ...ratelimit, namespace_id: ratelimit.namespace_id ?? ratelimit.name },
+	];
 }
 type QueueConsumer = NonNullable<Config["queues"]["consumers"]>[number];
 function queueConsumerEntry(consumer: QueueConsumer) {
@@ -471,6 +481,7 @@ type MiniflareBindingsConfig = Pick<
 	ConfigBundle,
 	| "bindings"
 	| "migrations"
+	| "exports"
 	| "queueConsumers"
 	| "name"
 	| "tails"
@@ -666,7 +677,8 @@ export function buildMiniflareBindingOptions(
 	}
 
 	const classNameToUseSQLite = getDurableObjectClassNameToUseSQLiteMap(
-		config.migrations
+		config.migrations,
+		config.exports
 	);
 
 	const externalWorkers: WorkerOptions[] = [];
@@ -1146,6 +1158,9 @@ export async function buildMiniflareOptions(
 		unsafeProxySharedSecret: proxyToUserWorkerAuthenticationSecret,
 		unsafeTriggerHandlers: true,
 		unsafeLocalExplorer: getLocalExplorerEnabledFromEnv(),
+		// Experimental local observability — the single switch (env var) that makes
+		// Miniflare core attach the trace collector to each user worker.
+		unsafeObservability: getLocalObservabilityEnabledFromEnv(),
 		telemetry: getMetricsConfig({ sendMetrics: config.sendMetrics }),
 		// The way we run Miniflare instances with wrangler dev is that there are two:
 		//  - one holding the proxy worker,

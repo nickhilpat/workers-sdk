@@ -1,5 +1,194 @@
 # create-cloudflare
 
+## 2.70.10
+
+### Patch Changes
+
+- [#14292](https://github.com/cloudflare/workers-sdk/pull/14292) [`21d048f`](https://github.com/cloudflare/workers-sdk/commit/21d048f3efa9aec85822ed7a06e6b11bfa31c624) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency | From   | To     |
+  | ---------- | ------ | ------ |
+  | sv         | 0.15.4 | 0.16.1 |
+
+- [#14292](https://github.com/cloudflare/workers-sdk/pull/14292) [`21d048f`](https://github.com/cloudflare/workers-sdk/commit/21d048f3efa9aec85822ed7a06e6b11bfa31c624) Thanks [@dependabot](https://github.com/apps/dependabot)! - Fix SvelteKit project creation failing with "Error parsing file: svelte.config.js"
+
+  As of `sv` 0.16, newly scaffolded SvelteKit projects no longer include a `svelte.config.js` file, and the adapter is configured in the Vite config instead. C3 now updates the adapter import in `vite.config.ts`/`vite.config.js` rather than `svelte.config.js`, so creating a SvelteKit project succeeds again.
+
+## 2.70.9
+
+### Patch Changes
+
+- [#14567](https://github.com/cloudflare/workers-sdk/pull/14567) [`0852346`](https://github.com/cloudflare/workers-sdk/commit/08523467752daa79f0f8950a01f35797aa6f3052) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "miniflare", "wrangler", "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency                | From         | To           |
+  | ------------------------- | ------------ | ------------ |
+  | workerd                   | 1.20260702.1 | 1.20260706.1 |
+  | @cloudflare/workers-types | 4.20260702.1 | 5.20260706.1 |
+
+## 2.70.8
+
+### Patch Changes
+
+- [#14556](https://github.com/cloudflare/workers-sdk/pull/14556) [`318da53`](https://github.com/cloudflare/workers-sdk/commit/318da532b67e03d64f1d80116f1c89be276797e1) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency      | From   | To      |
+  | --------------- | ------ | ------- |
+  | create-next-app | 16.2.9 | 16.2.10 |
+
+- [#14557](https://github.com/cloudflare/workers-sdk/pull/14557) [`5d81d19`](https://github.com/cloudflare/workers-sdk/commit/5d81d1977aa00acea4db96a7fc21199caa4a1d7b) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency      | From   | To     |
+  | --------------- | ------ | ------ |
+  | @angular/create | 22.0.4 | 22.0.5 |
+
+- [#14558](https://github.com/cloudflare/workers-sdk/pull/14558) [`c5f79a1`](https://github.com/cloudflare/workers-sdk/commit/c5f79a12835fea0cfe620df55a5ea3ccc1382cf5) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency          | From  | To    |
+  | ------------------- | ----- | ----- |
+  | create-react-router | 8.0.1 | 8.1.0 |
+
+- [#14559](https://github.com/cloudflare/workers-sdk/pull/14559) [`93fa704`](https://github.com/cloudflare/workers-sdk/commit/93fa70407459326fd4d9a1c315b1ba1a56e97f06) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency  | From  | To    |
+  | ----------- | ----- | ----- |
+  | create-vite | 9.1.0 | 9.1.1 |
+
+- [#14560](https://github.com/cloudflare/workers-sdk/pull/14560) [`64fbd69`](https://github.com/cloudflare/workers-sdk/commit/64fbd691e69069c873ffe7f55a2d2d0da279710b) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency   | From  | To    |
+  | ------------ | ----- | ----- |
+  | create-astro | 5.2.0 | 5.2.2 |
+
+- [#14544](https://github.com/cloudflare/workers-sdk/pull/14544) [`53f5a59`](https://github.com/cloudflare/workers-sdk/commit/53f5a599a4b91f4caa9ab08c638d3e19e6b702d2) Thanks [@petebacondarwin](https://github.com/petebacondarwin)! - Fix scaffolding of Qwik projects when `@cloudflare/workers-types` v5 is installed
+
+  `@cloudflare/workers-types` v5 removed the date-versioned entrypoints (e.g. `@cloudflare/workers-types/2024-01-01`) in favour of a single bare package import. C3 previously only added a date-versioned entrypoint to `tsconfig.json` and skipped updating the config entirely when none could be found, leaving templates that install workers-types (such as Qwik) without any Cloudflare types.
+
+  C3 now falls back to adding the bare `@cloudflare/workers-types` entry when no date-versioned entrypoint is available, so the correct types are always configured regardless of the installed version.
+
+- [#14492](https://github.com/cloudflare/workers-sdk/pull/14492) [`1ac96a1`](https://github.com/cloudflare/workers-sdk/commit/1ac96a14b7fb022acada114ab8793fe8a4ba79a5) Thanks [@penalosa](https://github.com/penalosa)! - Replace the CommonJS `xdg-app-paths` dependency with a vendored pure-ESM implementation
+
+  `xdg-app-paths` (and its `xdg-portable`/`os-paths` dependencies) are CommonJS only, which caused "Dynamic require of 'path' is not supported" errors when the surrounding code was bundled to ESM. The global config/cache directory resolution is now provided by a small, dependency-free pure-ESM module in `@cloudflare/workers-utils` that reproduces the previous path resolution exactly (verified against the real package in unit tests), so existing config and credential locations are unchanged. This also drops the transitive `fsevents` optional dependency that `xdg-app-paths` pulled in.
+
+  Miniflare and create-cloudflare now consume the shared helpers from `@cloudflare/workers-utils` instead of maintaining their own copies, importing node-only leaf entry points (`@cloudflare/workers-utils/fs-helpers`, `@cloudflare/workers-utils/global-wrangler-config-path`) where ESM bundling is required.
+
+## 2.70.7
+
+### Patch Changes
+
+- [#14490](https://github.com/cloudflare/workers-sdk/pull/14490) [`75d8cb0`](https://github.com/cloudflare/workers-sdk/commit/75d8cb0e32e0f4d66b699e88016d01f1666d8d8a) Thanks [@petebacondarwin](https://github.com/petebacondarwin)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency  | From    | To      |
+  | ----------- | ------- | ------- |
+  | create-vike | 0.0.654 | 0.0.660 |
+
+- [#14490](https://github.com/cloudflare/workers-sdk/pull/14490) [`75d8cb0`](https://github.com/cloudflare/workers-sdk/commit/75d8cb0e32e0f4d66b699e88016d01f1666d8d8a) Thanks [@petebacondarwin](https://github.com/petebacondarwin)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency | From   | To     |
+  | ---------- | ------ | ------ |
+  | nuxi       | 3.35.2 | 3.36.1 |
+
+- [#14490](https://github.com/cloudflare/workers-sdk/pull/14490) [`75d8cb0`](https://github.com/cloudflare/workers-sdk/commit/75d8cb0e32e0f4d66b699e88016d01f1666d8d8a) Thanks [@petebacondarwin](https://github.com/petebacondarwin)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency  | From  | To    |
+  | ----------- | ----- | ----- |
+  | create-vite | 9.0.7 | 9.1.0 |
+
+- [#14490](https://github.com/cloudflare/workers-sdk/pull/14490) [`75d8cb0`](https://github.com/cloudflare/workers-sdk/commit/75d8cb0e32e0f4d66b699e88016d01f1666d8d8a) Thanks [@petebacondarwin](https://github.com/petebacondarwin)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency    | From   | To     |
+  | ------------- | ------ | ------ |
+  | @tanstack/cli | 0.69.3 | 0.69.5 |
+
+- [#14490](https://github.com/cloudflare/workers-sdk/pull/14490) [`75d8cb0`](https://github.com/cloudflare/workers-sdk/commit/75d8cb0e32e0f4d66b699e88016d01f1666d8d8a) Thanks [@petebacondarwin](https://github.com/petebacondarwin)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency      | From   | To     |
+  | --------------- | ------ | ------ |
+  | @angular/create | 22.0.3 | 22.0.4 |
+
+- [#14490](https://github.com/cloudflare/workers-sdk/pull/14490) [`75d8cb0`](https://github.com/cloudflare/workers-sdk/commit/75d8cb0e32e0f4d66b699e88016d01f1666d8d8a) Thanks [@petebacondarwin](https://github.com/petebacondarwin)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency   | From  | To    |
+  | ------------ | ----- | ----- |
+  | create-astro | 5.0.6 | 5.2.0 |
+
+- [#14490](https://github.com/cloudflare/workers-sdk/pull/14490) [`75d8cb0`](https://github.com/cloudflare/workers-sdk/commit/75d8cb0e32e0f4d66b699e88016d01f1666d8d8a) Thanks [@petebacondarwin](https://github.com/petebacondarwin)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency    | From  | To    |
+  | ------------- | ----- | ----- |
+  | create-analog | 2.6.1 | 2.6.2 |
+
+- [#14490](https://github.com/cloudflare/workers-sdk/pull/14490) [`75d8cb0`](https://github.com/cloudflare/workers-sdk/commit/75d8cb0e32e0f4d66b699e88016d01f1666d8d8a) Thanks [@petebacondarwin](https://github.com/petebacondarwin)! - Fix npm installs for Analog projects
+
+  Analog's generated Vite overrides can cause npm to fail with `Unable to resolve reference $vite` when dependency resolution changes. `create-cloudflare` now opts npm-generated Analog projects out of those overrides so project creation can complete successfully.
+
+## 2.70.6
+
+### Patch Changes
+
+- [#14377](https://github.com/cloudflare/workers-sdk/pull/14377) [`bc08cfa`](https://github.com/cloudflare/workers-sdk/commit/bc08cfaa9c140ab6965ff8cd6d69a8f000439fba) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency  | From    | To      |
+  | ----------- | ------- | ------- |
+  | create-vike | 0.0.651 | 0.0.654 |
+
+- [#14378](https://github.com/cloudflare/workers-sdk/pull/14378) [`2091f80`](https://github.com/cloudflare/workers-sdk/commit/2091f804396f28a700fb90420e6ecf8c46336702) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency      | From   | To     |
+  | --------------- | ------ | ------ |
+  | @angular/create | 22.0.1 | 22.0.3 |
+
+- [#14379](https://github.com/cloudflare/workers-sdk/pull/14379) [`914bd65`](https://github.com/cloudflare/workers-sdk/commit/914bd65d2b02d6268709c6bc225a95fe33cfdd3e) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency          | From  | To    |
+  | ------------------- | ----- | ----- |
+  | create-react-router | 8.0.0 | 8.0.1 |
+
+- [#14380](https://github.com/cloudflare/workers-sdk/pull/14380) [`44a4084`](https://github.com/cloudflare/workers-sdk/commit/44a4084720eefa24bf09ed388a13cfc80e409825) Thanks [@dependabot](https://github.com/apps/dependabot)! - Update dependencies of "create-cloudflare"
+
+  The following dependency versions have been updated:
+
+  | Dependency | From   | To     |
+  | ---------- | ------ | ------ |
+  | create-vue | 3.22.3 | 3.22.4 |
+
+- [#14381](https://github.com/cloudflare/workers-sdk/pull/14381) [`f927adc`](https://github.com/cloudflare/workers-sdk/commit/f927adc72b06c36237384b68d6289e5415a90e63) Thanks [@dai-shi](https://github.com/dai-shi)! - Scaffold the Cloudflare-specific Waku files in the C3 script instead of relying on an external example
+
+  The Waku template now runs the default `create-waku` generator and overlays the Cloudflare-specific files (`wrangler.jsonc`, the Workers entrypoint `src/waku.server.tsx`, the Cloudflare `waku.config.ts`, and the `public/_headers` / `public/404.html` static assets) via `copyFiles`, installing the extra build dependencies and removing the redundant trailing-slash dev middleware in `configure`. This removes the dependency on the external `wakujs/waku-examples` repository for the scaffolded project content.
+
 ## 2.70.5
 
 ### Patch Changes
