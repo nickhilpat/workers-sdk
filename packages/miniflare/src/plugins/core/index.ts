@@ -1253,6 +1253,7 @@ export function getGlobalServices({
 				workerNames,
 				explorerWorkerOpts,
 				telemetry: sharedOptions.telemetry,
+				observabilityEnabled: sharedOptions.unsafeObservability === true,
 			})
 		);
 	}
