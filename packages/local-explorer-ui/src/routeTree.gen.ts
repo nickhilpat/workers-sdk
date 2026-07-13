@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ObservabilityIndexRouteImport } from './routes/observability/index'
 import { Route as WorkflowsWorkflowNameRouteImport } from './routes/workflows/$workflowName'
 import { Route as R2BucketNameRouteImport } from './routes/r2/$bucketName'
 import { Route as KvNamespaceIdRouteImport } from './routes/kv/$namespaceId'
@@ -19,12 +20,18 @@ import { Route as WorkflowsWorkflowNameIndexRouteImport } from './routes/workflo
 import { Route as R2BucketNameIndexRouteImport } from './routes/r2/$bucketName/index'
 import { Route as DoClassNameIndexRouteImport } from './routes/do/$className/index'
 import { Route as WorkflowsWorkflowNameInstanceIdRouteImport } from './routes/workflows/$workflowName/$instanceId'
+import { Route as ObservabilityTracesTraceIdRouteImport } from './routes/observability/traces/$traceId'
 import { Route as DoClassNameObjectIdRouteImport } from './routes/do/$className/$objectId'
 import { Route as R2BucketNameObjectSplatRouteImport } from './routes/r2/$bucketName/object.$'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ObservabilityIndexRoute = ObservabilityIndexRouteImport.update({
+  id: '/observability/',
+  path: '/observability/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const WorkflowsWorkflowNameRoute = WorkflowsWorkflowNameRouteImport.update({
@@ -74,6 +81,12 @@ const WorkflowsWorkflowNameInstanceIdRoute =
     path: '/$instanceId',
     getParentRoute: () => WorkflowsWorkflowNameRoute,
   } as any)
+const ObservabilityTracesTraceIdRoute =
+  ObservabilityTracesTraceIdRouteImport.update({
+    id: '/observability/traces/$traceId',
+    path: '/observability/traces/$traceId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const DoClassNameObjectIdRoute = DoClassNameObjectIdRouteImport.update({
   id: '/$objectId',
   path: '/$objectId',
@@ -92,7 +105,9 @@ export interface FileRoutesByFullPath {
   '/kv/$namespaceId': typeof KvNamespaceIdRoute
   '/r2/$bucketName': typeof R2BucketNameRouteWithChildren
   '/workflows/$workflowName': typeof WorkflowsWorkflowNameRouteWithChildren
+  '/observability/': typeof ObservabilityIndexRoute
   '/do/$className/$objectId': typeof DoClassNameObjectIdRoute
+  '/observability/traces/$traceId': typeof ObservabilityTracesTraceIdRoute
   '/workflows/$workflowName/$instanceId': typeof WorkflowsWorkflowNameInstanceIdRoute
   '/do/$className/': typeof DoClassNameIndexRoute
   '/r2/$bucketName/': typeof R2BucketNameIndexRoute
@@ -103,7 +118,9 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/d1/$databaseId': typeof D1DatabaseIdRoute
   '/kv/$namespaceId': typeof KvNamespaceIdRoute
+  '/observability': typeof ObservabilityIndexRoute
   '/do/$className/$objectId': typeof DoClassNameObjectIdRoute
+  '/observability/traces/$traceId': typeof ObservabilityTracesTraceIdRoute
   '/workflows/$workflowName/$instanceId': typeof WorkflowsWorkflowNameInstanceIdRoute
   '/do/$className': typeof DoClassNameIndexRoute
   '/r2/$bucketName': typeof R2BucketNameIndexRoute
@@ -118,7 +135,9 @@ export interface FileRoutesById {
   '/kv/$namespaceId': typeof KvNamespaceIdRoute
   '/r2/$bucketName': typeof R2BucketNameRouteWithChildren
   '/workflows/$workflowName': typeof WorkflowsWorkflowNameRouteWithChildren
+  '/observability/': typeof ObservabilityIndexRoute
   '/do/$className/$objectId': typeof DoClassNameObjectIdRoute
+  '/observability/traces/$traceId': typeof ObservabilityTracesTraceIdRoute
   '/workflows/$workflowName/$instanceId': typeof WorkflowsWorkflowNameInstanceIdRoute
   '/do/$className/': typeof DoClassNameIndexRoute
   '/r2/$bucketName/': typeof R2BucketNameIndexRoute
@@ -134,7 +153,9 @@ export interface FileRouteTypes {
     | '/kv/$namespaceId'
     | '/r2/$bucketName'
     | '/workflows/$workflowName'
+    | '/observability/'
     | '/do/$className/$objectId'
+    | '/observability/traces/$traceId'
     | '/workflows/$workflowName/$instanceId'
     | '/do/$className/'
     | '/r2/$bucketName/'
@@ -145,7 +166,9 @@ export interface FileRouteTypes {
     | '/'
     | '/d1/$databaseId'
     | '/kv/$namespaceId'
+    | '/observability'
     | '/do/$className/$objectId'
+    | '/observability/traces/$traceId'
     | '/workflows/$workflowName/$instanceId'
     | '/do/$className'
     | '/r2/$bucketName'
@@ -159,7 +182,9 @@ export interface FileRouteTypes {
     | '/kv/$namespaceId'
     | '/r2/$bucketName'
     | '/workflows/$workflowName'
+    | '/observability/'
     | '/do/$className/$objectId'
+    | '/observability/traces/$traceId'
     | '/workflows/$workflowName/$instanceId'
     | '/do/$className/'
     | '/r2/$bucketName/'
@@ -174,6 +199,8 @@ export interface RootRouteChildren {
   KvNamespaceIdRoute: typeof KvNamespaceIdRoute
   R2BucketNameRoute: typeof R2BucketNameRouteWithChildren
   WorkflowsWorkflowNameRoute: typeof WorkflowsWorkflowNameRouteWithChildren
+  ObservabilityIndexRoute: typeof ObservabilityIndexRoute
+  ObservabilityTracesTraceIdRoute: typeof ObservabilityTracesTraceIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -183,6 +210,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/observability/': {
+      id: '/observability/'
+      path: '/observability'
+      fullPath: '/observability/'
+      preLoaderRoute: typeof ObservabilityIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/workflows/$workflowName': {
@@ -247,6 +281,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/workflows/$workflowName/$instanceId'
       preLoaderRoute: typeof WorkflowsWorkflowNameInstanceIdRouteImport
       parentRoute: typeof WorkflowsWorkflowNameRoute
+    }
+    '/observability/traces/$traceId': {
+      id: '/observability/traces/$traceId'
+      path: '/observability/traces/$traceId'
+      fullPath: '/observability/traces/$traceId'
+      preLoaderRoute: typeof ObservabilityTracesTraceIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/do/$className/$objectId': {
       id: '/do/$className/$objectId'
@@ -315,6 +356,8 @@ const rootRouteChildren: RootRouteChildren = {
   KvNamespaceIdRoute: KvNamespaceIdRoute,
   R2BucketNameRoute: R2BucketNameRouteWithChildren,
   WorkflowsWorkflowNameRoute: WorkflowsWorkflowNameRouteWithChildren,
+  ObservabilityIndexRoute: ObservabilityIndexRoute,
+  ObservabilityTracesTraceIdRoute: ObservabilityTracesTraceIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
